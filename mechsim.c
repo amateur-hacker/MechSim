@@ -72,73 +72,49 @@ int list_sound_packs() {
 int validate_sound_pack(const char *sound_name) {
     char config_path[MAX_PATH_LENGTH];
     char sound_path[MAX_PATH_LENGTH];
-    
+
     snprintf(config_path, sizeof(config_path), "%s/%s/config.json", AUDIO_BASE_DIR, sound_name);
     snprintf(sound_path, sizeof(sound_path), "%s/%s", AUDIO_BASE_DIR, sound_name);
-    
+
     // Check if directory exists
     if (access(sound_path, F_OK) != 0) {
         fprintf(stderr, "Error: Sound pack '%s' not found in %s/\n", sound_name, AUDIO_BASE_DIR);
         fprintf(stderr, "Use --list to see available sound packs.\n");
         return 0;
     }
-    
+
     // Check if config.json exists
     if (access(config_path, R_OK) != 0) {
         fprintf(stderr, "Error: Config file not found: %s\n", config_path);
         return 0;
     }
-    
+
     return 1;
 }
 
 void cleanup_processes(int sig) {
     (void)sig; // Suppress unused parameter warning
-    
+
     printf("\nShutting down MechSim...\n");
-    
+
     if (sound_pid > 0) {
         kill(sound_pid, SIGTERM);
         waitpid(sound_pid, NULL, 0);
     }
-    
+
     if (keyboard_pid > 0) {
         kill(keyboard_pid, SIGTERM);
         waitpid(keyboard_pid, NULL, 0);
     }
-    
+
     exit(0);
-}
-
-// Function to check if sudo credentials are cached
-int check_sudo_cached() {
-    int status = system("sudo -n true 2>/dev/null");
-    return WEXITSTATUS(status) == 0;
-}
-
-// Function to prompt for sudo password if needed
-int ensure_sudo_access() {
-    if (check_sudo_cached()) {
-        return 1; // Already have sudo access
-    }
-    
-    printf("This program requires sudo access to monitor keyboard events.\n");
-    printf("Please enter your password when prompted:\n");
-    
-    int status = system("sudo -v");
-    if (WEXITSTATUS(status) != 0) {
-        fprintf(stderr, "Error: Failed to obtain sudo access\n");
-        return 0;
-    }
-    
-    return 1;
 }
 
 int main(int argc, char *argv[]) {
     char *sound_name = "eg-oreo"; // Default sound pack
     int verbose = 0;
     int list_sounds = 0;
-    
+
     // Parse command line arguments
     static struct option long_options[] = {
         {"sound",   required_argument, 0, 's'},
@@ -150,7 +126,7 @@ int main(int argc, char *argv[]) {
     };
 
     int volume = 50;
-    
+
     int opt;
     while ((opt = getopt_long(argc, argv, "s:V:lhv", long_options, NULL)) != -1) {
         switch (opt) {
@@ -176,50 +152,45 @@ int main(int argc, char *argv[]) {
                 return 1;
         }
     }
-    
+
     // Handle list command
     if (list_sounds) {
         return list_sound_packs();
     }
-    
+
     // Validate sound pack
     if (!validate_sound_pack(sound_name)) {
         return 1;
     }
-    
-    // Ensure sudo access BEFORE forking
-    if (!ensure_sudo_access()) {
-        return 1;
-    }
-    
+
     // Check if required executables exist
     char get_key_presses_path[MAX_PATH_LENGTH];
     char sound_player_path[MAX_PATH_LENGTH];
-    
+
     snprintf(get_key_presses_path, sizeof(get_key_presses_path), "%s/get_key_presses", MECHSIM_BIN_DIR);
     snprintf(sound_player_path, sizeof(sound_player_path), "%s/keyboard_sound_player", MECHSIM_BIN_DIR);
-    
+
     if (access(get_key_presses_path, X_OK) != 0) {
         fprintf(stderr, "Error: Cannot find or execute %s\n", get_key_presses_path);
         return 1;
     }
-    
+
     if (access(sound_player_path, X_OK) != 0) {
         fprintf(stderr, "Error: Cannot find or execute %s\n", sound_player_path);
         return 1;
     }
-    
+
     // Setup signal handler for cleanup
     signal(SIGINT, cleanup_processes);
     signal(SIGTERM, cleanup_processes);
-    
+
     // Build paths
     char config_path[MAX_PATH_LENGTH];
     char sound_dir[MAX_PATH_LENGTH];
-    
+
     snprintf(config_path, sizeof(config_path), "%s/%s/config.json", AUDIO_BASE_DIR, sound_name);
     snprintf(sound_dir, sizeof(sound_dir), "%s/%s", AUDIO_BASE_DIR, sound_name);
-    
+
     if (verbose) {
         printf("MechSim starting...\n");
         printf("Sound pack: %s\n", sound_name);
@@ -230,7 +201,7 @@ int main(int argc, char *argv[]) {
         printf("MechSim started with sound pack: %s\n", sound_name);
         printf("Press Ctrl+C to exit.\n");
     }
-    
+
     // Create pipe for communication
     int pipefd[2];
     if (pipe(pipefd) == -1) {
@@ -248,11 +219,11 @@ int main(int argc, char *argv[]) {
     if (sound_pid == 0) {
         // Child process: sound player
         close(pipefd[1]); // Close write end
-        
+
         // Redirect stdin from pipe
         dup2(pipefd[0], STDIN_FILENO);
         close(pipefd[0]);
-        
+
         // Change to sound directory (so relative paths work)
         if (chdir(sound_dir) != 0) {
             perror("chdir");
@@ -270,7 +241,6 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    // Then fork keyboard listener process (sudo)
     keyboard_pid = fork();
     if (keyboard_pid == -1) {
         perror("fork");
@@ -290,21 +260,18 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Starting keyboard listener...\n");
         }
 
-        // Use -n flag to prevent sudo from prompting again (credentials should be cached)
-        char sudo_path[256];
-        snprintf(sudo_path, sizeof(sudo_path), "%s/bin/sudo", PACKAGE_PREFIX);
-        execl(sudo_path, "sudo", "-n", get_key_presses_path, (char *)NULL);
+        execl(get_key_presses_path, "get_key_presses", (char *)NULL);
         perror("execl get_key_presses");
         exit(1);
     }
-    
+
     // Parent process: wait for children
     close(pipefd[0]);
     close(pipefd[1]);
-    
+
     int status;
     pid_t finished_pid;
-    
+
     // Wait for either child to exit
     while ((finished_pid = wait(&status)) > 0) {
         if (finished_pid == keyboard_pid) {
@@ -327,7 +294,7 @@ int main(int argc, char *argv[]) {
             }
         }
     }
-    
+
     printf("MechSim exited.\n");
     return 0;
 }

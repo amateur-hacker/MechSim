@@ -41,9 +41,9 @@ test: all
 	./$(MECHSIM_TARGET) --list
 	@echo ""
 	@echo "To run MechSim:"
-	@echo "  sudo ./$(MECHSIM_TARGET)                    # Default sound"
-	@echo "  sudo ./$(MECHSIM_TARGET) -s cherrymx-blue-abs  # Specific sound"
-	@echo "  sudo ./$(MECHSIM_TARGET) --help             # Show help"
+	@echo "  ./$(MECHSIM_TARGET)                    # Default sound"
+	@echo "  ./$(MECHSIM_TARGET) -s cherrymx-blue-abs  # Specific sound"
+	@echo "  ./$(MECHSIM_TARGET) --help             # Show help"
 
 install:
 	@echo "Installing MechSim to $(DESTDIR)$(BINDIR) and $(DESTDIR)$(SHAREDIR)..."
