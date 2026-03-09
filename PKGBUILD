@@ -5,6 +5,7 @@ pkgdesc="CLI-based mechanical keyboard sound simulator"
 arch=('x86_64')
 url="https://github.com/amateur-hacker/mechsim"
 license=('MIT')
+options=('!debug')
 
 depends=(
   'json-c'
