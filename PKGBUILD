@@ -7,18 +7,18 @@ url="https://github.com/amateur-hacker/mechsim"
 license=('MIT')
 
 depends=(
-  'libevdev'
-  'libinput'
-  'libudev'
   'json-c'
-  'libsndfile'
   'libpulse'
+  'systemd-libs'
 )
 
 makedepends=(
   'gcc'
   'make'
   'pkgconf'
+  'libevdev'
+  'libinput'
+  'libsndfile'
 )
 
 source=("$pkgname::git+https://github.com/amateur-hacker/mechsim.git")
